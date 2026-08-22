@@ -27,6 +27,13 @@ Design a cup holder consisting of:
 - **C-Shaped Base Leg** — Partial arc at the bottom for stability (adjustable arc span)
 - **Chamfered Joints** — Reinforcing chamfers at ring-to-stand and stand-to-leg joints
 
+### Top Cover Generator
+
+Design a circular top cover (lid) with a diamond wire grid pattern:
+- **Cylindrical Wall** — Short hollow cylinder with configurable inner diameter (90mm), wall thickness (1.2mm), and height (10mm)
+- **Diamond Grid Top** — Two sets of bars crossing at ±45 degrees, forming diamond-shaped openings for maximum airflow while blocking objects (configurable grid spacing and bar width)
+- **Rim Ring** — Solid ring connecting the grid to the cylinder wall edge
+
 ## Architecture
 
 The application is organized into three layers:
@@ -34,7 +41,7 @@ The application is organized into three layers:
 | Layer | Responsibility | Modules |
 |-------|---------------|---------|
 | **UI Layer** | Streamlit pages, progress display, 3D viewer, download/shutdown | `app.py`, `pages/`, `stl_viewer.py` |
-| **Geometry Engine** | Parametric mesh generation, assembly, validation | `funnel_generator.py`, `cup_holder_generator.py`, `mesh_validator.py`, `parameter_validator.py` |
+| **Geometry Engine** | Parametric mesh generation, assembly, validation | `funnel_generator.py`, `cup_holder_generator.py`, `top_cover_generator.py`, `mesh_validator.py`, `parameter_validator.py` |
 | **I/O Layer** | Binary STL export and round-trip verification | `stl_exporter.py` |
 
 Supporting infrastructure:
@@ -95,6 +102,17 @@ The app will open in your default browser. Use the sidebar navigation to select 
 | Chamfer Size | 3.0 mm | 0.5 - 15 mm, < stand height / 2 |
 | Circle Segments | 64 | 16 - 128 |
 
+### Top Cover Generator
+
+| Parameter | Default | Constraints |
+|-----------|---------|-------------|
+| Inner Diameter | 90.0 mm | 10 - 300 mm |
+| Wall Thickness | 1.2 mm | 0.4 - 10 mm, < inner diameter / 2 |
+| Cover Height | 10.0 mm | 2 - 100 mm |
+| Grid Spacing | 20.0 mm | 5 - 50 mm |
+| Bar Width | 1.2 mm | 0.4 - 5 mm, < grid spacing |
+| Circle Segments | 64 | 16 - 128 |
+
 ## Testing
 
 Run the full test suite:
@@ -116,9 +134,11 @@ Firefly_Lamp/
 ├── app.py                       # Streamlit entry point (home page)
 ├── pages/
 │   ├── 1_Funnel_Generator.py    # Funnel STL generator page
-│   └── 2_Cup_Holder_Generator.py # Cup holder STL generator page
+│   ├── 2_Cup_Holder_Generator.py # Cup holder STL generator page
+│   └── 3_Top_Cover_Generator.py # Top cover STL generator page
 ├── funnel_generator.py          # Funnel + sleeve mesh generation, assembly
 ├── cup_holder_generator.py      # Cup holder mesh generation (ring, stand, leg, chamfers)
+├── top_cover_generator.py       # Top cover mesh generation (cylinder wall, diamond grid)
 ├── mesh_validator.py            # Mesh quality validation (trimesh)
 ├── parameter_validator.py       # Input validation and data models
 ├── stl_exporter.py              # Binary STL export and round-trip check

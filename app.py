@@ -6,6 +6,7 @@ are available as pages in the sidebar navigation.
 Pages:
 - 1_Funnel_Generator: Parametric funnel with cylinder sleeve STL generator
 - 2_Cup_Holder_Generator: Cup holder with ring, stand, and C-leg STL generator
+- 3_Top_Cover_Generator: Circular top cover with mesh hole pattern STL generator
 """
 
 import streamlit as st
@@ -32,7 +33,7 @@ st.markdown(
 
 st.markdown("---")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     st.subheader("Funnel Generator")
@@ -49,6 +50,14 @@ with col2:
         "joints, and a C-shaped base leg for stability."
     )
     st.markdown("**Parameters:** ring diameter, ring/stand wall thickness, total height, leg arc, chamfer size")
+
+with col3:
+    st.subheader("Top Cover Generator")
+    st.markdown(
+        "Generate a circular top cover with a hexagonal mesh pattern of holes "
+        "for ventilation or decorative purposes."
+    )
+    st.markdown("**Parameters:** inner diameter, wall thickness, cover height, hole diameter")
 
 st.markdown("---")
 st.info("Select a generator from the sidebar navigation to get started.")
