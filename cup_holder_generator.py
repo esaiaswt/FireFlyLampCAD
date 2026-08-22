@@ -110,18 +110,17 @@ def generate_cup_holder_mesh(
     # Extrusion: horizontal plate from stand outer wall outward
     extrusion_outer_radius = stand_outer_radius + extrusion_length
 
-    # Overall height from base to outer ring top = 120mm (total_height param)
-    # Outer ring sits at the very top
+    # Overall height from base to top = 120mm (total_height param)
     z_plate_bottom = 0.0
     z_plate_top = plate_thickness
 
-    # Outer ring at top
+    # Outer stands: full height from base to top (120mm)
+    z_outer_stand_bottom = z_plate_bottom
+    z_outer_stand_top = total_height
+
+    # Outer ring at top (top 10mm = outer_ring_height)
     z_outer_ring_top = total_height
     z_outer_ring_bottom = total_height - outer_ring_height
-
-    # Outer stands: from base to outer ring bottom
-    z_outer_stand_bottom = z_plate_bottom
-    z_outer_stand_top = z_outer_ring_bottom
 
     # Inner ring: positioned in the lower portion of the assembly
     # The inner ring top is at the inner assembly height (total_height parameter
@@ -206,6 +205,17 @@ def generate_cup_holder_mesh(
             stand_outer_radius, extrusion_outer_radius,
             stand_wall_thickness, ring_inner_radius,
             z_plate_top, z_ring_top,
+            center_angle, num_segments
+        ))
+
+    # 8. Inward extrusions at top of each outer stand connecting to outer ring
+    # These bridge from the outer stand inner wall (extrusion_outer_radius) inward
+    # to the outer ring outer wall (outer_ring_outer_radius), at the top 10mm
+    for center_angle in [math.pi, 0.0]:
+        all_face_arrays.append(_generate_extrusion(
+            outer_ring_outer_radius, extrusion_outer_radius,
+            stand_wall_thickness, ring_inner_radius,
+            z_outer_ring_bottom, z_outer_ring_top,
             center_angle, num_segments
         ))
 
