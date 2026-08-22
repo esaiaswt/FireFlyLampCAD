@@ -1,0 +1,11 @@
+streamlit
+numpy
+numpy-stl
+trimesh
+pyvista
+stpyvista
+hypothesis
+pytest
+psutil
+keyboard
+python-dotenv

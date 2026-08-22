@@ -1,0 +1,33 @@
+# Secrets
+.env
+
+# Log files
+logs/
+
+# Python cache
+__pycache__/
+
+# Generated STL files
+*.stl
+
+# Byte-compiled files
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+.kiro/
+
+# Hypothesis test database
+.hypothesis/
+
+# Distribution
+dist/
+build/
+*.egg-info/
