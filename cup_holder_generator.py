@@ -154,10 +154,12 @@ def generate_cup_holder_mesh(
 
     all_face_arrays = []
 
-    # 1. Inner ring (cup holder)
-    all_face_arrays.append(_generate_ring(
+    # 1. Inner ring (cup holder) with grooves at 90 degrees from stands
+    all_face_arrays.append(_generate_ring_with_grooves(
         ring_inner_radius, ring_outer_radius,
-        z_ring_bottom, z_ring_top, num_segments
+        z_ring_bottom, z_ring_top,
+        groove_width=5.0, groove_depth=3.0,
+        num_segments=num_segments
     ))
 
     # 2. Two inner stands (at angle=pi and angle=0) - from plate top to inner ring top
@@ -770,3 +772,145 @@ def _generate_connecting_wall(
     idx += 1
 
     return faces[:idx]
+
+
+def _generate_ring_with_grooves(
+    inner_radius: float,
+    outer_radius: float,
+    z_bottom: float,
+    z_top: float,
+    groove_width: float,
+    groove_depth: float,
+    num_segments: int,
+) -> np.ndarray:
+    """Generate a full ring with two rectangular grooves cut from the top.
+
+    The grooves are located at angle=pi/2 (+Y) and angle=3*pi/2 (-Y),
+    which is 90 degrees from the stands (at angle=0 and angle=pi).
+
+    Each groove is:
+    - groove_width mm wide (along the circumference at the outer radius)
+    - groove_depth mm deep (cutting down from z_top)
+    - Cuts through the full wall thickness (inner to outer radius)
+
+    The ring is generated in segments, with the groove areas having a
+    lower top surface (z_top - groove_depth) instead of z_top.
+
+    Args:
+        inner_radius: Inner radius of the ring.
+        outer_radius: Outer radius of the ring.
+        z_bottom: Bottom Z coordinate of the ring.
+        z_top: Top Z coordinate of the ring (grooves cut down from here).
+        groove_width: Width of each groove along circumference in mm.
+        groove_depth: Depth of each groove from the top in mm.
+        num_segments: Number of circumferential segments.
+
+    Returns:
+        Numpy array of shape (N, 3, 3) containing triangle vertices.
+    """
+    logger.debug(
+        f"_generate_ring_with_grooves() - inner_r={inner_radius:.2f}, "
+        f"outer_r={outer_radius:.2f}, groove_width={groove_width:.2f}, "
+        f"groove_depth={groove_depth:.2f}"
+    )
+
+    # Calculate groove angular span
+    # groove_width is the arc length at outer_radius
+    groove_half_angle = (groove_width / 2.0) / outer_radius
+
+    # Groove centers at pi/2 and 3*pi/2
+    groove_centers = [math.pi / 2.0, 3.0 * math.pi / 2.0]
+
+    # Groove Z dimensions
+    z_groove_top = z_top - groove_depth  # bottom of the groove notch
+
+    # Build face list
+    faces_list = []
+
+    n = num_segments
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    angle_step = 2 * np.pi / n
+
+    def is_in_groove(angle):
+        """Check if an angle falls within any groove."""
+        for gc in groove_centers:
+            # Normalize angle difference to [-pi, pi]
+            diff = angle - gc
+            diff = (diff + math.pi) % (2 * math.pi) - math.pi
+            if abs(diff) < groove_half_angle:
+                return True
+        return False
+
+    cos_a = np.cos(angles)
+    sin_a = np.sin(angles)
+
+    for i in range(n):
+        i_next = (i + 1) % n
+
+        a0 = angles[i]
+        a1 = angles[i_next] if i_next != 0 else 2 * np.pi
+
+        # Check if this segment is in a groove
+        mid_angle = (a0 + a1) / 2.0
+        if i_next == 0:
+            mid_angle = (a0 + 2 * np.pi) / 2.0
+
+        in_groove = is_in_groove(mid_angle)
+        seg_z_top = z_groove_top if in_groove else z_top
+
+        # Outer surface (full height: z_bottom to seg_z_top)
+        faces_list.append([[outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], z_bottom],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], seg_z_top]])
+        faces_list.append([[outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], seg_z_top],
+                           [outer_radius * cos_a[i], outer_radius * sin_a[i], seg_z_top]])
+
+        # Inner surface
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                           [inner_radius * cos_a[i_next], inner_radius * sin_a[i_next], seg_z_top],
+                           [inner_radius * cos_a[i_next], inner_radius * sin_a[i_next], z_bottom]])
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                           [inner_radius * cos_a[i], inner_radius * sin_a[i], seg_z_top],
+                           [inner_radius * cos_a[i_next], inner_radius * sin_a[i_next], seg_z_top]])
+
+        # Top surface (at seg_z_top)
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], seg_z_top],
+                           [outer_radius * cos_a[i], outer_radius * sin_a[i], seg_z_top],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], seg_z_top]])
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], seg_z_top],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], seg_z_top],
+                           [inner_radius * cos_a[i_next], inner_radius * sin_a[i_next], seg_z_top]])
+
+        # Bottom surface
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], z_bottom],
+                           [outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom]])
+        faces_list.append([[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                           [inner_radius * cos_a[i_next], inner_radius * sin_a[i_next], z_bottom],
+                           [outer_radius * cos_a[i_next], outer_radius * sin_a[i_next], z_bottom]])
+
+    # Add vertical walls at groove boundaries (the side walls of each groove)
+    for gc in groove_centers:
+        for side in [-1, 1]:
+            edge_angle = gc + side * groove_half_angle
+            ca = math.cos(edge_angle)
+            sa = math.sin(edge_angle)
+
+            # Vertical wall from z_groove_top to z_top across the wall thickness
+            p_inner_bottom = [inner_radius * ca, inner_radius * sa, z_groove_top]
+            p_inner_top = [inner_radius * ca, inner_radius * sa, z_top]
+            p_outer_bottom = [outer_radius * ca, outer_radius * sa, z_groove_top]
+            p_outer_top = [outer_radius * ca, outer_radius * sa, z_top]
+
+            if side == -1:
+                # Wall facing in +angle direction (into the groove)
+                faces_list.append([p_inner_bottom, p_outer_bottom, p_outer_top])
+                faces_list.append([p_inner_bottom, p_outer_top, p_inner_top])
+            else:
+                # Wall facing in -angle direction (into the groove)
+                faces_list.append([p_inner_bottom, p_outer_top, p_outer_bottom])
+                faces_list.append([p_inner_bottom, p_inner_top, p_outer_top])
+
+    faces = np.array(faces_list, dtype=np.float64)
+    return faces
