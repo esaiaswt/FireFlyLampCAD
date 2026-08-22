@@ -77,14 +77,14 @@ ring_height = st.sidebar.number_input(
 st.sidebar.header("Inner Stand Parameters")
 
 total_height = st.sidebar.number_input(
-    "Inner Assembly Height (mm)",
-    min_value=20.0,
-    max_value=200.0,
-    value=40.0,
-    step=1.0,
+    "Total Height - Base to Top (mm)",
+    min_value=50.0,
+    max_value=300.0,
+    value=120.0,
+    step=5.0,
     format="%.1f",
     key="ch_total_height",
-    help="Height from ring top to base plate bottom.",
+    help="Total height from base plate bottom to outer ring top.",
 )
 
 stand_wall_thickness = st.sidebar.number_input(
@@ -196,10 +196,10 @@ num_segments = st.sidebar.slider(
 # --- Parameter Validation ---
 errors = []
 
-if total_height <= ring_height:
+if total_height <= outer_ring_height:
     errors.append(
-        f"Inner assembly height ({total_height}mm) must be greater than ring height "
-        f"({ring_height}mm) to allow room for the stands."
+        f"Total height ({total_height}mm) must be greater than outer ring height "
+        f"({outer_ring_height}mm)."
     )
 
 if ring_wall_thickness >= ring_inner_diameter / 2:

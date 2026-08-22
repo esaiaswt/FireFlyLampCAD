@@ -107,25 +107,41 @@ def generate_cup_holder_mesh(
     plate_inner_radius = plate_outer_radius - leg_width
     plate_thickness = ring_wall_thickness
 
-    # Z coordinates for inner assembly
-    z_ring_top = total_height
-    z_ring_bottom = total_height - ring_height
-    z_plate_top = plate_thickness
-    z_plate_bottom = 0.0
-
     # Extrusion: horizontal plate from stand outer wall outward
     extrusion_outer_radius = stand_outer_radius + extrusion_length
-    extrusion_thickness = plate_thickness  # same as base plate
 
-    # Outer stands: start at base plate level, go up outer_stand_height
+    # Overall height from base to outer ring top = 120mm (total_height param)
+    # Outer ring sits at the very top
+    z_plate_bottom = 0.0
+    z_plate_top = plate_thickness
+
+    # Outer ring at top
+    z_outer_ring_top = total_height
+    z_outer_ring_bottom = total_height - outer_ring_height
+
+    # Outer stands: from base to outer ring bottom
     z_outer_stand_bottom = z_plate_bottom
-    z_outer_stand_top = z_outer_stand_bottom + outer_stand_height
+    z_outer_stand_top = z_outer_ring_bottom
 
-    # Outer ring: at top of outer stands
+    # Inner ring: positioned in the lower portion of the assembly
+    # The inner ring top is at the inner assembly height (total_height parameter
+    # in the old sense was 40mm). We'll place the inner ring centered vertically
+    # at a reasonable position. Let's keep it at the same relative position:
+    # inner ring top = total_height * (40/130) roughly, but let's just use
+    # a fixed inner_ring_top_z based on the inner assembly being in the bottom section.
+    # Actually, looking at the image, the inner ring is in the lower third.
+    # Let's place inner ring top at plate_top + (stand connects plate to ring)
+    # We'll use: inner ring top = base plate top + stand_height_below_ring + ring_height
+    # For now, keep inner assembly height as a fraction. The inner ring should be
+    # below the outer ring. Let's place it at Z=40 (same as before) since that
+    # looked correct in the image.
+    inner_assembly_height = 40.0  # inner ring top at Z=40
+    z_ring_top = inner_assembly_height
+    z_ring_bottom = z_ring_top - ring_height
+
+    # Outer ring radii: should encompass the outer stands
     outer_ring_inner_radius = outer_ring_diameter / 2.0
     outer_ring_outer_radius = outer_ring_inner_radius + outer_ring_wall
-    z_outer_ring_bottom = z_outer_stand_top
-    z_outer_ring_top = z_outer_stand_top + outer_ring_height
 
     logger.debug(
         f"Derived: ring_inner_r={ring_inner_radius:.2f}, "
@@ -145,7 +161,7 @@ def generate_cup_holder_mesh(
         z_ring_bottom, z_ring_top, num_segments
     ))
 
-    # 2. Two inner stands (at angle=pi and angle=0)
+    # 2. Two inner stands (at angle=pi and angle=0) - from plate top to inner ring top
     for center_angle in [math.pi, 0.0]:
         all_face_arrays.append(_generate_stand(
             ring_inner_radius, stand_wall_thickness,
@@ -158,7 +174,7 @@ def generate_cup_holder_mesh(
         z_plate_bottom, z_plate_top, num_segments
     ))
 
-    # 4. Outward extrusions from each stand (horizontal plates)
+    # 4. Outward extrusions from each stand (horizontal plates at base level)
     for center_angle in [math.pi, 0.0]:
         all_face_arrays.append(_generate_extrusion(
             stand_outer_radius, extrusion_outer_radius,
@@ -167,7 +183,7 @@ def generate_cup_holder_mesh(
             center_angle, num_segments
         ))
 
-    # 5. Two outer stands
+    # 5. Two outer stands - from base to outer ring bottom
     for center_angle in [math.pi, 0.0]:
         all_face_arrays.append(_generate_outer_stand(
             extrusion_outer_radius, outer_stand_wall,
@@ -176,11 +192,22 @@ def generate_cup_holder_mesh(
             center_angle, num_segments
         ))
 
-    # 6. Outer ring at top of outer stands
+    # 6. Outer ring at top of outer stands (connected - ring bottom = stand top)
     all_face_arrays.append(_generate_ring(
         outer_ring_inner_radius, outer_ring_outer_radius,
         z_outer_ring_bottom, z_outer_ring_top, num_segments
     ))
+
+    # 7. Connecting walls between inner stand outer wall and outer stand inner wall
+    # These are radial flat walls running from stand_outer_radius to extrusion_outer_radius
+    # at the same arc span as the stands, from plate top to inner ring top height
+    for center_angle in [math.pi, 0.0]:
+        all_face_arrays.append(_generate_connecting_wall(
+            stand_outer_radius, extrusion_outer_radius,
+            stand_wall_thickness, ring_inner_radius,
+            z_plate_top, z_ring_top,
+            center_angle, num_segments
+        ))
 
     # Combine all face arrays
     total_faces = sum(len(f) for f in all_face_arrays)
@@ -616,6 +643,120 @@ def _generate_outer_stand(
     faces[idx] = [[inner_r * cos_a[-1], inner_r * sin_a[-1], z_bottom],
                   [inner_r * cos_a[-1], inner_r * sin_a[-1], z_top],
                   [outer_r * cos_a[-1], outer_r * sin_a[-1], z_top]]
+    idx += 1
+
+    return faces[:idx]
+
+
+def _generate_connecting_wall(
+    inner_radius: float,
+    outer_radius: float,
+    stand_wall_thickness: float,
+    ring_inner_radius: float,
+    z_bottom: float,
+    z_top: float,
+    center_angle: float,
+    num_segments: int,
+) -> np.ndarray:
+    """Generate a radial connecting wall between inner stand and outer stand.
+
+    This is a flat vertical wall running radially from the inner stand outer
+    wall (stand_outer_radius) to the outer stand inner wall (extrusion_outer_radius),
+    with the same angular span as the stands. It bridges the gap between the
+    inner and outer stands.
+
+    Args:
+        inner_radius: Inner radius of wall (= stand outer radius).
+        outer_radius: Outer radius of wall (= extrusion outer radius).
+        stand_wall_thickness: Stand wall thickness (for arc calculation).
+        ring_inner_radius: Inner ring radius (for arc calculation).
+        z_bottom: Bottom Z coordinate.
+        z_top: Top Z coordinate.
+        center_angle: Angular center.
+        num_segments: Segments for full circle.
+
+    Returns:
+        Numpy array of shape (N, 3, 3) containing triangle vertices.
+    """
+    stand_arc_half_angle = math.atan2(stand_wall_thickness * 2, ring_inner_radius)
+    stand_arc_half_angle = max(stand_arc_half_angle, math.radians(15))
+
+    start_angle = center_angle - stand_arc_half_angle
+    end_angle = center_angle + stand_arc_half_angle
+
+    arc_segments = max(4, int(num_segments * (2 * stand_arc_half_angle) / (2 * np.pi)))
+    angles = np.linspace(start_angle, end_angle, arc_segments + 1)
+    cos_a = np.cos(angles)
+    sin_a = np.sin(angles)
+
+    n = arc_segments
+    # This wall has: outer surface, inner surface, top, bottom, 2 end caps
+    total_faces = 8 * n + 4
+    faces = np.zeros((total_faces, 3, 3), dtype=np.float64)
+    idx = 0
+
+    # Outer curved surface (at outer_radius)
+    for i in range(n):
+        faces[idx] = [[outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_bottom],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_top]]
+        idx += 1
+        faces[idx] = [[outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_top],
+                      [outer_radius * cos_a[i], outer_radius * sin_a[i], z_top]]
+        idx += 1
+
+    # Inner curved surface (at inner_radius)
+    for i in range(n):
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                      [inner_radius * cos_a[i + 1], inner_radius * sin_a[i + 1], z_top],
+                      [inner_radius * cos_a[i + 1], inner_radius * sin_a[i + 1], z_bottom]]
+        idx += 1
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                      [inner_radius * cos_a[i], inner_radius * sin_a[i], z_top],
+                      [inner_radius * cos_a[i + 1], inner_radius * sin_a[i + 1], z_top]]
+        idx += 1
+
+    # Top surface
+    for i in range(n):
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_top],
+                      [outer_radius * cos_a[i], outer_radius * sin_a[i], z_top],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_top]]
+        idx += 1
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_top],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_top],
+                      [inner_radius * cos_a[i + 1], inner_radius * sin_a[i + 1], z_top]]
+        idx += 1
+
+    # Bottom surface
+    for i in range(n):
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_bottom],
+                      [outer_radius * cos_a[i], outer_radius * sin_a[i], z_bottom]]
+        idx += 1
+        faces[idx] = [[inner_radius * cos_a[i], inner_radius * sin_a[i], z_bottom],
+                      [inner_radius * cos_a[i + 1], inner_radius * sin_a[i + 1], z_bottom],
+                      [outer_radius * cos_a[i + 1], outer_radius * sin_a[i + 1], z_bottom]]
+        idx += 1
+
+    # Left end cap
+    faces[idx] = [[inner_radius * cos_a[0], inner_radius * sin_a[0], z_bottom],
+                  [outer_radius * cos_a[0], outer_radius * sin_a[0], z_bottom],
+                  [outer_radius * cos_a[0], outer_radius * sin_a[0], z_top]]
+    idx += 1
+    faces[idx] = [[inner_radius * cos_a[0], inner_radius * sin_a[0], z_bottom],
+                  [outer_radius * cos_a[0], outer_radius * sin_a[0], z_top],
+                  [inner_radius * cos_a[0], inner_radius * sin_a[0], z_top]]
+    idx += 1
+
+    # Right end cap
+    faces[idx] = [[inner_radius * cos_a[-1], inner_radius * sin_a[-1], z_bottom],
+                  [outer_radius * cos_a[-1], outer_radius * sin_a[-1], z_top],
+                  [outer_radius * cos_a[-1], outer_radius * sin_a[-1], z_bottom]]
+    idx += 1
+    faces[idx] = [[inner_radius * cos_a[-1], inner_radius * sin_a[-1], z_bottom],
+                  [inner_radius * cos_a[-1], inner_radius * sin_a[-1], z_top],
+                  [outer_radius * cos_a[-1], outer_radius * sin_a[-1], z_top]]
     idx += 1
 
     return faces[:idx]
