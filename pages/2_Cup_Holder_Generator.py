@@ -33,12 +33,13 @@ if "cup_holder_error" not in st.session_state:
 # --- Main Area ---
 st.title("Cup Holder STL Generator")
 st.markdown(
-    "Design a cup holder with a top ring, vertical stand, and C-shaped base leg. "
+    "Design a cup holder assembly with inner ring, dual stands, base plate, "
+    "outward extrusions, outer stands, and outer ring. "
     "Adjust parameters in the sidebar, then generate and preview your 3D model."
 )
 
 # --- Sidebar: Parameter Input Controls ---
-st.sidebar.header("Ring Parameters")
+st.sidebar.header("Inner Ring Parameters")
 
 ring_inner_diameter = st.sidebar.number_input(
     "Ring Inner Diameter (mm)",
@@ -48,7 +49,7 @@ ring_inner_diameter = st.sidebar.number_input(
     step=0.5,
     format="%.1f",
     key="ch_ring_inner_diameter",
-    help="Inner diameter of the top holding ring.",
+    help="Inner diameter of the cup holding ring.",
 )
 
 ring_wall_thickness = st.sidebar.number_input(
@@ -59,7 +60,7 @@ ring_wall_thickness = st.sidebar.number_input(
     step=0.1,
     format="%.1f",
     key="ch_ring_wall_thickness",
-    help="Wall thickness of the top ring.",
+    help="Wall thickness of the inner ring.",
 )
 
 ring_height = st.sidebar.number_input(
@@ -70,20 +71,20 @@ ring_height = st.sidebar.number_input(
     step=0.5,
     format="%.1f",
     key="ch_ring_height",
-    help="Height of the top ring wall.",
+    help="Height of the inner ring wall.",
 )
 
-st.sidebar.header("Stand Parameters")
+st.sidebar.header("Inner Stand Parameters")
 
 total_height = st.sidebar.number_input(
-    "Total Height - Ring Top to Leg Bottom (mm)",
+    "Inner Assembly Height (mm)",
     min_value=20.0,
     max_value=200.0,
     value=40.0,
     step=1.0,
     format="%.1f",
     key="ch_total_height",
-    help="Total height from top of ring to bottom of the C-leg.",
+    help="Height from ring top to base plate bottom.",
 )
 
 stand_wall_thickness = st.sidebar.number_input(
@@ -94,43 +95,90 @@ stand_wall_thickness = st.sidebar.number_input(
     step=0.5,
     format="%.1f",
     key="ch_stand_wall_thickness",
-    help="Wall thickness of the vertical stand connecting ring to leg.",
+    help="Wall thickness of the inner stands.",
 )
 
-st.sidebar.header("C-Leg Parameters")
+st.sidebar.header("Base Plate Parameters")
 
 leg_width = st.sidebar.number_input(
-    "Leg Width / Radial Thickness (mm)",
+    "Base Plate Width (mm)",
     min_value=3.0,
     max_value=50.0,
     value=10.0,
     step=1.0,
     format="%.1f",
     key="ch_leg_width",
-    help="Radial width of the C-shaped flat plate leg.",
+    help="Radial width of the full O base plate.",
 )
 
-leg_arc_degrees = st.sidebar.slider(
-    "Leg Arc Span (degrees)",
-    min_value=90,
-    max_value=330,
-    value=180,
-    step=10,
-    key="ch_leg_arc_degrees",
-    help="Angular span of the C-shaped base leg. 360 would be a full ring.",
-)
+st.sidebar.header("Extrusion & Outer Stand")
 
-st.sidebar.header("Joint Parameters")
-
-chamfer_size = st.sidebar.number_input(
-    "Chamfer Size (mm)",
-    min_value=0.5,
-    max_value=10.0,
-    value=3.0,
-    step=0.5,
+extrusion_length = st.sidebar.number_input(
+    "Outward Extrusion Length (mm)",
+    min_value=1.0,
+    max_value=50.0,
+    value=10.0,
+    step=1.0,
     format="%.1f",
-    key="ch_chamfer_size",
-    help="Size of the reinforcing chamfers at stand-to-plate and stand-to-ring joints.",
+    key="ch_extrusion_length",
+    help="Length of outward extrusion from each stand's outer wall.",
+)
+
+outer_stand_height = st.sidebar.number_input(
+    "Outer Stand Height (mm)",
+    min_value=20.0,
+    max_value=300.0,
+    value=120.0,
+    step=5.0,
+    format="%.1f",
+    key="ch_outer_stand_height",
+    help="Height of the outer stands.",
+)
+
+outer_stand_wall = st.sidebar.number_input(
+    "Outer Stand Wall Thickness (mm)",
+    min_value=0.4,
+    max_value=10.0,
+    value=1.2,
+    step=0.1,
+    format="%.1f",
+    key="ch_outer_stand_wall",
+    help="Wall thickness of the outer stands.",
+)
+
+st.sidebar.header("Outer Ring Parameters")
+
+outer_ring_diameter = st.sidebar.number_input(
+    "Outer Ring Diameter (mm)",
+    min_value=20.0,
+    max_value=300.0,
+    value=80.0,
+    step=1.0,
+    format="%.1f",
+    key="ch_outer_ring_diameter",
+    help="Diameter of the outer ring connecting both outer stands.",
+)
+
+outer_ring_wall = st.sidebar.number_input(
+    "Outer Ring Wall Thickness (mm)",
+    min_value=0.4,
+    max_value=10.0,
+    value=1.2,
+    step=0.1,
+    format="%.1f",
+    key="ch_outer_ring_wall",
+    help="Wall thickness of the outer ring.",
+)
+
+outer_ring_height = st.sidebar.number_input(
+    "Outer Ring Height (mm)",
+    min_value=3.0,
+    max_value=50.0,
+    value=10.0,
+    step=1.0,
+    format="%.1f",
+    key="ch_outer_ring_height",
+    help="Height (width) of the outer ring.",
 )
 
 st.sidebar.header("Quality")
@@ -150,8 +198,8 @@ errors = []
 
 if total_height <= ring_height:
     errors.append(
-        f"Total height ({total_height}mm) must be greater than ring height "
-        f"({ring_height}mm) to allow room for the stand."
+        f"Inner assembly height ({total_height}mm) must be greater than ring height "
+        f"({ring_height}mm) to allow room for the stands."
     )
 
 if ring_wall_thickness >= ring_inner_diameter / 2:
@@ -168,10 +216,11 @@ if errors:
 # --- Display parameter summary ---
 st.sidebar.divider()
 st.sidebar.markdown("**Computed Dimensions:**")
-st.sidebar.markdown(f"- Ring outer diameter: {ring_inner_diameter + 2 * ring_wall_thickness:.1f} mm")
-st.sidebar.markdown(f"- Stand height: {total_height - ring_height:.1f} mm")
-st.sidebar.markdown(f"- Leg outer diameter: {ring_inner_diameter + 2 * leg_width:.1f} mm")
-st.sidebar.markdown(f"- Leg arc: {leg_arc_degrees}\u00b0 of circle")
+st.sidebar.markdown(f"- Inner ring outer diameter: {ring_inner_diameter + 2 * ring_wall_thickness:.1f} mm")
+st.sidebar.markdown(f"- Stand outer radius: {ring_inner_diameter / 2 + stand_wall_thickness:.1f} mm")
+st.sidebar.markdown(f"- Extrusion outer radius: {ring_inner_diameter / 2 + stand_wall_thickness + extrusion_length:.1f} mm")
+st.sidebar.markdown(f"- Outer stand top Z: {outer_stand_height:.1f} mm")
+st.sidebar.markdown(f"- Outer ring top Z: {outer_stand_height + outer_ring_height:.1f} mm")
 
 
 # --- Generation Pipeline ---
@@ -203,9 +252,13 @@ def run_cup_holder_pipeline():
             ring_height=ring_height,
             stand_wall_thickness=stand_wall_thickness,
             total_height=total_height,
-            leg_arc_degrees=float(leg_arc_degrees),
             leg_width=leg_width,
-            chamfer_size=chamfer_size,
+            extrusion_length=extrusion_length,
+            outer_stand_height=outer_stand_height,
+            outer_stand_wall=outer_stand_wall,
+            outer_ring_diameter=outer_ring_diameter,
+            outer_ring_wall=outer_ring_wall,
+            outer_ring_height=outer_ring_height,
             num_segments=num_segments,
         )
 
