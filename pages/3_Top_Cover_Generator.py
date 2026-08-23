@@ -45,7 +45,7 @@ inner_diameter = st.sidebar.number_input(
     "Inner Diameter (mm)",
     min_value=10.0,
     max_value=300.0,
-    value=90.0,
+    value=92.0,
     step=1.0,
     format="%.1f",
     key="tc_inner_diameter",

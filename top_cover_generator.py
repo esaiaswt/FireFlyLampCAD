@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 
 def generate_top_cover_mesh(
-    inner_diameter: float = 90.0,
+    inner_diameter: float = 92.0,
     wall_thickness: float = 1.2,
     cover_height: float = 10.0,
     grid_spacing: float = 20.0,
