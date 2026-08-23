@@ -158,7 +158,7 @@ def generate_cup_holder_mesh(
     all_face_arrays.append(_generate_ring_with_grooves(
         ring_inner_radius, ring_outer_radius,
         z_ring_bottom, z_ring_top,
-        groove_width=5.0, groove_depth=3.0,
+        groove_width=7.0, groove_depth=3.0,
         num_segments=num_segments
     ))
 
